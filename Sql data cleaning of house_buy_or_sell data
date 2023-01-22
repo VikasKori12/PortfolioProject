@@ -1,0 +1,154 @@
+	--converting date format
+select "SaleDate",cast("SaleDate" as date) as converted from demo.house
+
+Update demo.house
+set "SaleDate" =cast("SaleDate" as date)
+
+
+select "SaleDate" from demo.house
+
+-- populate property address
+
+select * from demo.house
+order by "ParcelID" 
+
+select "PropertyAddress" from demo.house
+where "PropertyAddress" is null
+
+select a."ParcelID",a."PropertyAddress", b."ParcelID", b."PropertyAddress",COALESCE(a."PropertyAddress",b."PropertyAddress")
+from demo.house as a
+join demo.house as b
+on a."ParcelID" = b."ParcelID"
+and a."UniqueID" <> b."UniqueID"
+where a."PropertyAddress" is null
+
+
+update demo.house as a2
+set "PropertyAddress" = COALESCE(a2."PropertyAddress",b."PropertyAddress")
+from demo.house as b
+where a2."ParcelID" = b."ParcelID"
+and a2."UniqueID" <> b."UniqueID"
+and a2."PropertyAddress" is null
+																					 
+---breaking out address
+
+select "PropertyAddress" from demo.house
+
+select 
+substring("PropertyAddress",1,strpos("PropertyAddress", ',')-1) as address,
+substring("PropertyAddress",strpos("PropertyAddress",',')+1,length("PropertyAddress")) as address2
+from demo.house
+
+
+alter table demo.house
+add PropertySplitAddress varchar(255);
+
+update demo.house
+set PropertySplitAddress = substring("PropertyAddress",1,strpos("PropertyAddress", ',')-1);
+
+
+alter table demo.house
+add PropertySplitCity varchar(255);
+
+update demo.house
+set PropertySplitCity = substring("PropertyAddress",strpos("PropertyAddress",',')+1,length("PropertyAddress"));
+
+select * from demo.house
+
+
+--owner address
+
+select "OwnerAddress" from demo.house
+
+select 
+split_part("OwnerAddress",',',1),
+split_part("OwnerAddress",',',2),
+split_part("OwnerAddress",',',3)
+from demo.house
+
+alter table demo.house
+add OwnerSplitAddress varchar(255);
+
+update demo.house
+set OwnerSplitAddress = split_part("OwnerAddress",',',1);
+
+alter table demo.house
+add OwnerSplitCity varchar(255);
+
+update demo.house
+set OwnerSplitCity = split_part("OwnerAddress",',',2);
+
+alter table demo.house
+add OwnerSplitState varchar(255);
+
+update demo.house
+set OwnerSplitState = split_part("OwnerAddress",',',1);
+
+select * from demo.house
+
+-- updating SoladAsVacant
+
+select distinct("SoldAsVacant"), count("SoldAsVacant") from demo.house
+group by "SoldAsVacant"
+
+
+
+select "SoldAsVacant",
+case 
+	 when "SoldAsVacant" = 'Y' then 'Yes'
+	 when "SoldAsVacant" = 'N' then 'No'
+	 else "SoldAsVacant"
+     end
+from demo.house
+
+update demo.house
+set "SoldAsVacant" = case 
+	 when "SoldAsVacant" = 'Y' then 'Yes'
+	 when "SoldAsVacant" = 'N' then 'No'
+	 else "SoldAsVacant"
+     end
+	 
+	 
+---- removing duplicate data
+
+with rowCte As(
+select * , row_number() over(
+		PARTITION BY "ParcelID",
+				 "PropertyAddress",
+				 "SalePrice",
+				 "SaleDate",
+				 "LegalReference"
+				 ORDER BY
+					"UniqueID"
+) as rownumber
+from demo.house
+)
+select * from rowCte
+where rownumber>1
+order by "PropertyAddress"
+
+select * from demo.house
+
+alter table
+------DELETE these duplicates
+
+with rowCte As(
+select * , row_number() over(
+		PARTITION BY "ParcelID",
+				 "PropertyAddress",
+				 "SalePrice",
+				 "SaleDate",
+				 "LegalReference"
+				 ORDER BY
+					"UniqueID"
+) as rownumber
+from demo.house
+)
+delete from demo.house
+where "ParcelID" = any(select "ParcelID" from rowCte where rownumber>1)
+
+-----delete unused columns
+select * from demo.house
+
+alter table demo.house
+drop column "TaxDistrict"
